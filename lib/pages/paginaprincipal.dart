@@ -3,6 +3,7 @@ import 'package:app_desktop/pages/friends.dart';
 import 'package:app_desktop/pages/to-do.dart';
 import 'package:app_desktop/widget/card_conversas.dart';
 import 'package:flutter/material.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 
 class MainPage extends StatefulWidget {
   @override
@@ -10,33 +11,45 @@ class MainPage extends StatefulWidget {
 }
 
 class _MainPageState extends State<MainPage> {
-  
   final ScrollController _scrollController = ScrollController();
-  final List<Map<String, String>> contatos = [
-    {'id': '1', 'nome': 'Ana', 'status': 'online', 'tag': 'aB3kL9dX', "imagem" : "assets/splash.png"},
-    {'id': '2', 'nome': 'Bruno', 'status': 'offline', 'tag': 'Pq8ZrRt2', "imagem" : ""},
-    {'id': '3', 'nome': 'Carla', 'status': 'online', 'tag': 'Xy12ABcd', "imagem" : "assets/splash.png"},
-    {'id': '4', 'nome': 'Afonso', 'status': 'online', 'tag': 'Lm9NpQ7w', "imagem" : ""},
-    {'id': '5', 'nome': 'José', 'status': 'offline', 'tag': 'Rt6YvWs1', "imagem" : ""},
-    {'id': '6', 'nome': 'Martim', 'status': 'offline', 'tag': 'Jk3ZxUv5', "imagem" : "assets/splash.png"},
-    {'id': '7', 'nome': 'Mariana', 'status': 'online', 'tag': 'Fg8TbSn4', "imagem" : ""},
-    {'id': '8', 'nome': 'Rafael', 'status': 'offline', 'tag': 'Dc9ErKw2', "imagem" : ""},
-    {'id': '9', 'nome': 'Isabela', 'status': 'online', 'tag': 'Uz5NmQl7', "imagem" : "assets/splash.png"},
-    {'id': '10', 'nome': 'Lucas', 'status': 'online', 'tag': 'Py1WqEv6', "imagem" : ""},
-    {'id': '11', 'nome': 'Sofia', 'status': 'offline', 'tag': 'Ox7BkRj3', "imagem" : ""},
-    {'id': '12', 'nome': 'Pedro', 'status': 'offline', 'tag': 'Vn4HyTf8', "imagem" : "assets/splash.png"},
-    {'id': '13', 'nome': 'Beatriz', 'status': 'offline', 'tag': 'Qs2DrCm9', "imagem" : ""},
-    {'id': '14', 'nome': 'Tiago', 'status': 'offline', 'tag': 'Ml6ZxOw1', "imagem" : ""},
-    {'id': '15', 'nome': 'Helena', 'status': 'offline', 'tag': 'Kb9TyVu5', "imagem" : "assets/splash.png"},
-    {'id': '16', 'nome': 'Gabriel', 'status': 'offline', 'tag': 'Aj3NpQs7', "imagem" : ""},
-  ];
+
+  int currentUserId = 1;
+  final String MensagensQuery = r'''
+    subscription GetMensagens($userId: Int!) {
+      grupo_membros(where: { id_user: { _eq: $userId } }) {
+        grupo {
+          id
+          nome
+          imagem
+          grupo_membros {
+            user {
+              id
+              nome
+              imagem
+              status
+            }
+          }
+        }
+      }
+    }
+  ''';
+
+  final String UserQuery = r'''
+    subscription getuser($userId: Int!) {
+      users(where: {id: {_eq: $userId}}) {
+        id
+        nome
+        imagem
+        status
+      }
+    }
+  ''';
 
   String? contatoSelecionado = "Amigos";
 
-
   @override
   void dispose() {
-    _scrollController.dispose(); 
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -44,73 +57,162 @@ class _MainPageState extends State<MainPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🧭 Coluna da esquerda (Sidebar)
           Container(
             width: 260,
             color: Color.fromRGBO(18, 18, 20, 1),
-            child: Scrollbar(
-              controller: _scrollController, 
-              thickness: 5,
-              radius: Radius.circular(10),
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                controller: _scrollController, 
-                physics: ClampingScrollPhysics(),
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Menu
-                    MenuItemButton(text: "Amigos", onTap: () {setState(() {contatoSelecionado = "Amigos";});}),
-                    SizedBox(height: 8),
-                    MenuItemButton(text: "TO-DO", onTap: () {setState(() {contatoSelecionado = "TO-DO";});}),
-                    SizedBox(height: 20),
-
-                    // Título "Mensagens" e botão
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Mensagens",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: Colors.white,
-                            ),
-                          ),
-                          IconButton(
-                            padding: EdgeInsets.zero,
-                            constraints: BoxConstraints(),
-                            onPressed: () {},
-                            icon: Icon(Icons.add, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(height: 10),
-
-                    // Lista de contatos
-                    ...contatos.map(
-                      (contato) => Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: ConversaCard(
-                          nome: contato['nome']!,
-                          imagem: contato['imagem'],
-                          status: contato['status']!,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Scrollbar(
+                  controller: _scrollController,
+                  thickness: 5,
+                  radius: Radius.circular(10),
+                  thumbVisibility: true,
+                  child: SingleChildScrollView(
+                    controller: _scrollController,
+                    physics: ClampingScrollPhysics(),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                    child: Column(
+                      children: [
+                        // Menu
+                        MenuItemButton(
+                          text: "Amigos",
                           onTap: () {
                             setState(() {
-                              contatoSelecionado = contato['id'];
+                              contatoSelecionado = "Amigos";
                             });
                           },
                         ),
-                      ),
+                        SizedBox(height: 8),
+                        MenuItemButton(
+                          text: "TO-DO",
+                          onTap: () {
+                            setState(() {
+                              contatoSelecionado = "TO-DO";
+                            });
+                          },
+                        ),
+                        SizedBox(height: 20),
+
+                        // Título "Mensagens" e botão
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "Mensagens",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: BoxConstraints(),
+                                onPressed: () {},
+                                icon: Icon(Icons.add, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 10),
+
+                        // Lista de contatos
+                        Subscription(
+                          options: SubscriptionOptions(
+                            document: gql(MensagensQuery),
+                            variables: {'userId': currentUserId},
+                          ),
+                          builder: (result, {fetchMore, refetch}) {
+                            if (result.isLoading) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            if (result.hasException) {
+                              return Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Text(
+                                  "Erro: ${result.exception.toString()}",
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              );
+                            }
+
+                            final amigos = result.data?['grupo_membros'] ?? [];
+
+                            return Column(
+                              children: List.generate(amigos.length, (index) {
+                                final amigo =
+                                    amigos[index]['grupo']['grupo_membros'];
+                                final outro;
+
+                                if (amigo.length == 2) {
+                                  // Identifica o outro usuário (não o atual)
+                                  final user1 = amigo[0]['user'];
+                                  final user2 = amigo[1]['user'];
+
+                                  outro = user1['id'] == currentUserId
+                                      ? user2
+                                      : user1;
+                                } else {
+                                  outro = amigos[index]['grupo'];
+                                }
+
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 3),
+                                  child: ConversaCard(
+                                    nome: outro['nome'],
+                                    imagem: outro['imagem'],
+                                    status: outro['status'] != null ? outro['status'] : -1,
+                                    onTap: () {
+                                      setState(() {
+                                        contatoSelecionado = outro['id']
+                                            .toString();
+                                      });
+                                    },
+                                  ),
+                                );
+                              }),
+                            );
+                          },
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+
+                Subscription(
+                  options: SubscriptionOptions(
+                    document: gql(UserQuery),
+                    variables: {'userId': currentUserId},
+                  ),
+                  builder: (result, {fetchMore, refetch}) {
+                    if (result.isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    if (result.hasException) {
+                      return Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          "Erro: ${result.exception.toString()}",
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      );
+                    }
+
+                    final user = result.data?['users'][0];
+
+                    return _buildperfil(context, user);
+                  },
+                ),
+              ],
             ),
           ),
 
@@ -118,13 +220,11 @@ class _MainPageState extends State<MainPage> {
           Expanded(
             child: Container(
               color: Colors.grey[900],
-              child: Center(
-                child: contatoSelecionado == "Amigos"
-                    ? Friends()
-                    : contatoSelecionado == "TO-DO" ? 
-                      TodoPage()
-                    : ChatPage()
-              ),
+              child: contatoSelecionado == "Amigos"
+                  ? Friends()
+                  : contatoSelecionado == "TO-DO"
+                  ? TodoPage()
+                  : ChatPage(),
             ),
           ),
         ],
@@ -166,4 +266,72 @@ class MenuItemButton extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget _buildperfil(BuildContext context, Map<String, dynamic> user) {
+  return Padding(
+    padding: EdgeInsets.only(bottom: 15, left: 20, right: 20),
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Row(
+          children: [
+            Stack(
+              children: [
+                user['imagem'] != null && user['imagem'].isNotEmpty
+                    ? CircleAvatar(
+                        radius: 19,
+                        backgroundColor: Colors.grey[800],
+                        backgroundImage: NetworkImage(user['imagem']),
+                        onBackgroundImageError: (_, __) {},
+                      )
+                    : CircleAvatar(
+                        radius: 19,
+                        backgroundColor: Colors.grey[800],
+                        child: Icon(Icons.person, color: Colors.white, size: 19),
+                      ),
+                if (user['status'] != -1)
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: user['status'] == 2
+                            ? Colors.green
+                            : user['status'] == 1
+                                ? Color.fromARGB(255, 253, 198, 0)
+                                : Colors.grey,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.black,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(width: 10),
+            Text(
+                user['nome'] ?? '',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+          ],
+        ),
+        Row(
+          children: [
+            Icon(Icons.mic, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Icon(Icons.headset, color: Colors.white, size: 20),
+            SizedBox(width: 12),
+            Icon(Icons.settings, color: Colors.white, size: 20),
+          ],
+        ),
+      ],
+    ),
+  );
 }

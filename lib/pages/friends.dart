@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:graphql_flutter/graphql_flutter.dart';
 
 class Friends extends StatefulWidget {
   const Friends({super.key});
@@ -10,24 +11,35 @@ class Friends extends StatefulWidget {
 class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final List<Map<String, String>> friends = [
-    {'id': '1', 'nome': 'Ana', 'status': 'online', 'tag': 'aB3kL9dX', "imagem" : "assets/splash.png"},
-    {'id': '2', 'nome': 'Bruno', 'status': 'offline', 'tag': 'Pq8ZrRt2', "imagem" : ""},
-    {'id': '3', 'nome': 'Carla', 'status': 'online', 'tag': 'Xy12ABcd', "imagem" : "assets/splash.png"},
-    {'id': '4', 'nome': 'Afonso', 'status': 'online', 'tag': 'Lm9NpQ7w', "imagem" : ""},
-    {'id': '5', 'nome': 'José', 'status': 'offline', 'tag': 'Rt6YvWs1', "imagem" : ""},
-    {'id': '6', 'nome': 'Martim', 'status': 'offline', 'tag': 'Jk3ZxUv5', "imagem" : "assets/splash.png"},
-    {'id': '7', 'nome': 'Mariana', 'status': 'online', 'tag': 'Fg8TbSn4', "imagem" : ""},
-    {'id': '8', 'nome': 'Rafael', 'status': 'offline', 'tag': 'Dc9ErKw2', "imagem" : ""},
-    {'id': '9', 'nome': 'Isabela', 'status': 'online', 'tag': 'Uz5NmQl7', "imagem" : "assets/splash.png"},
-    {'id': '10', 'nome': 'Lucas', 'status': 'online', 'tag': 'Py1WqEv6', "imagem" : ""},
-    {'id': '11', 'nome': 'Sofia', 'status': 'offline', 'tag': 'Ox7BkRj3', "imagem" : ""},
-    {'id': '12', 'nome': 'Pedro', 'status': 'offline', 'tag': 'Vn4HyTf8', "imagem" : "assets/splash.png"},
-    {'id': '13', 'nome': 'Beatriz', 'status': 'offline', 'tag': 'Qs2DrCm9', "imagem" : ""},
-    {'id': '14', 'nome': 'Tiago', 'status': 'offline', 'tag': 'Ml6ZxOw1', "imagem" : ""},
-    {'id': '15', 'nome': 'Helena', 'status': 'offline', 'tag': 'Kb9TyVu5', "imagem" : "assets/splash.png"},
-    {'id': '16', 'nome': 'Gabriel', 'status': 'offline', 'tag': 'Aj3NpQs7', "imagem" : ""},
-  ];
+  int currentUserId = 1;
+  final String friendsQuery = r'''
+    subscription GetFriends($userId: Int!) {
+      amigos(
+        where: {
+          _or: [
+            {id_user1: {_eq: $userId}},
+            {id_user2: {_eq: $userId}}
+          ],
+          status: {_eq: 1}
+        }
+      ) {
+        user {
+          id
+          nome
+          status
+          tag
+          imagem
+        }
+        userByIdUser2 {
+          id
+          nome
+          status
+          tag
+          imagem
+        }
+      }
+    }
+  ''';
 
   @override
   void initState() {
@@ -41,7 +53,17 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
     super.dispose();
   }
 
-  Widget _buildFriendTile(Map<String, String> friend) {
+  // Função para extrair o "amigo" (não currentUser) da amizade
+  Map<String, dynamic> extractFriend(Map<String, dynamic> friendship) {
+    final idUser1 = friendship['user']['id'];
+    if (idUser1 == currentUserId) {
+      return friendship['userByIdUser2'];
+    } else {
+      return friendship['user'];
+    }
+  }
+
+ Widget _buildFriendTile(Map<String, dynamic> friend) {
     return ListTile(
       leading: Stack(
           children: [
@@ -64,9 +86,9 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
                 width: 12,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: friend['status'] == 'online'
+                  color: friend['status'] == 2
                       ? Colors.green
-                      : Colors.grey,
+                      : friend['status'] == 1 ? Color.fromARGB(255, 253, 198, 0) : Colors.grey,
                   shape: BoxShape.circle,
                   border: Border.all(
                     color:
@@ -104,7 +126,6 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
           SizedBox(height: 12),
           ElevatedButton(
             onPressed: () {
-              // lógica para adicionar amigo aqui
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text('Função de adicionar não implementada.'),
@@ -122,7 +143,6 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Mini nav usando TabBar
         Container(
           color: Colors.grey[900],
           child: TabBar(
@@ -137,34 +157,54 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
             ],
           ),
         ),
-
-        // Conteúdo das abas
         Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              // Online friends
-              ListView.separated(
-  padding: EdgeInsets.all(8),
-  itemCount: friends.where((f) => f['status'] == 'online').length,
-  itemBuilder: (context, index) {
-    final onlineFriends = friends.where((f) => f['status'] == 'online').toList();
-    return _buildFriendTile(onlineFriends[index]);
-  },
-  separatorBuilder: (context, index) => SizedBox(height: 8),
-),
+          child: Subscription(
+            options: SubscriptionOptions(
+              document: gql(friendsQuery),
+              variables: {'userId': currentUserId},
+            ),
+            builder: (result) {
+              if (result.hasException) {
+                return Center(child: Text('Erro: ${result.exception.toString()}'));
+              }
+              if (result.isLoading) {
+                return Center(child: CircularProgressIndicator());
+              }
 
-// All friends
-ListView.separated(
-  padding: EdgeInsets.all(8),
-  itemCount: friends.length,
-  itemBuilder: (context, index) => _buildFriendTile(friends[index]),
-  separatorBuilder: (context, index) => SizedBox(height: 8),
-),
+              final rawFriends = (result.data?['amigos'] ?? []) as List<dynamic>;
 
-              // Add friend
-              _buildAddFriendTab(),
-            ],
+              // Extrai os amigos reais (não o utilizador atual)
+              final friendsList = rawFriends
+                  .map((f) => extractFriend(f as Map<String, dynamic>))
+                  .toList();
+
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  // Online friends
+                  ListView.separated(
+                    padding: EdgeInsets.all(8),
+                    itemCount: friendsList.where((f) => f['status'] == 1 || f['status'] == 2).length,
+                    itemBuilder: (context, index) {
+                      final onlineFriends = friendsList.where((f) => f['status'] == 1 || f['status'] == 2).toList();
+                      return _buildFriendTile(onlineFriends[index]);
+                    },
+                    separatorBuilder: (context, index) => SizedBox(height: 8),
+                  ),
+
+                  // All friends
+                  ListView.separated(
+                    padding: EdgeInsets.all(8),
+                    itemCount: friendsList.length,
+                    itemBuilder: (context, index) => _buildFriendTile(friendsList[index]),
+                    separatorBuilder: (context, index) => SizedBox(height: 8),
+                  ),
+
+                  // Add friend tab
+                  _buildAddFriendTab(),
+                ],
+              );
+            },
           ),
         ),
       ],

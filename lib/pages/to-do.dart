@@ -521,6 +521,7 @@ class _TodoPageState extends State<TodoPage> {
         body: TabBarView(
           children: [_buildMyListsTab(), _buildSharedListsTab()],
         ),
+        floatingActionButton: FloatingActionButton(onPressed: () {}, child: Icon(Icons.add),),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 class ConversaCard extends StatefulWidget {
   final String nome;
-  final String status;
+  final int status;
   final String? imagem;
   final VoidCallback onTap;
 
@@ -49,7 +49,7 @@ class _ConversaCardState extends State<ConversaCard> {
                     ? CircleAvatar(
                         radius: 19,
                         backgroundColor: Colors.grey[800],
-                        backgroundImage: AssetImage(widget.imagem!),
+                        backgroundImage: NetworkImage(widget.imagem!),
                         onBackgroundImageError: (_, __) {},
                       )
                     : CircleAvatar(
@@ -57,25 +57,27 @@ class _ConversaCardState extends State<ConversaCard> {
                         backgroundColor: Colors.grey[800],
                         child: Icon(Icons.person, color: Colors.white, size: 19),
                     ),
-                    Positioned(
-                      bottom: 0,
-                      right: 0,
-                      child: Container(
-                        width: 12,
-                        height: 12,
-                        decoration: BoxDecoration(
-                          color: widget.status == 'online'
-                              ? Colors.green
-                              : Colors.grey,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color:
-                                Colors.black, // borda para destacar o círculo no avatar
-                            width: 2,
+                    if(widget.status != -1)...[
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: widget.status == 2
+                                ? Colors.green
+                                : widget.status == 1 ? Color.fromARGB(255, 253, 198, 0) : Colors.grey,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color:
+                                  Colors.black, // borda para destacar o círculo no avatar
+                              width: 2,
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ]
                   ],
                 ),
                 const SizedBox(width: 10),
