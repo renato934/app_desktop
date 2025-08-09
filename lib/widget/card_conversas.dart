@@ -48,7 +48,7 @@ class _ConversaCardState extends State<ConversaCard> {
                     temImagem
                     ? CircleAvatar(
                         radius: 19,
-                        backgroundColor: Colors.grey[800],
+                        backgroundColor: Color.fromARGB(255, 124, 77, 255),
                         backgroundImage: NetworkImage(widget.imagem!),
                         onBackgroundImageError: (_, __) {},
                       )

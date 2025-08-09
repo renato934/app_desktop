@@ -1,44 +1,33 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_single_instance/flutter_single_instance.dart';
-import 'package:app_desktop/rotas/rotas.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
+import 'package:app_desktop/widget/atividade_status.dart'; // seu watcher atualizado
+import 'package:app_desktop/rotas/rotas.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initHiveForFlutter(); // Cache GraphQL
+  await initHiveForFlutter();
 
   final instance = FlutterSingleInstance();
 
   if (await instance.isFirstInstance()) {
-    // Define o link HTTP
-    final HttpLink httpLink = HttpLink(
-      'http://188.80.118.142:8080/v1/graphql',
-    );
+    final HttpLink httpLink = HttpLink('http://188.82.117.231:8080/v1/graphql');
 
-    // Define o link WebSocket (usa ws:// porque o endpoint é HTTP)
     final WebSocketLink websocketLink = WebSocketLink(
-      'ws://188.80.118.142:8080/v1/graphql',
+      'ws://188.82.117.231:8080/v1/graphql',
       config: SocketClientConfig(
         autoReconnect: true,
         inactivityTimeout: Duration(seconds: 30),
-        initialPayload: () async => {
-          // Se tiveres autenticação, adiciona os headers aqui
-          'headers': {
-            // 'Authorization': 'Bearer O_TEU_TOKEN',
-          },
-        },
       ),
     );
 
-    // Junta os links: subscrições usam WebSocket, resto usa HTTP
     final Link link = Link.split(
       (request) => request.isSubscription,
       websocketLink,
       httpLink,
     );
 
-    // Cria o client
     final client = ValueNotifier(
       GraphQLClient(
         link: link,
@@ -61,12 +50,20 @@ class MainApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GraphQLProvider(
       client: client,
-      child: MaterialApp.router(
-        routerConfig: rotasApp,
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(
-          primaryColor: Colors.tealAccent[400],
-          scaffoldBackgroundColor: const Color(0xFF121212),
+      child: ActivityStatusWatcher(
+        graphqlClient: client.value,
+        onStatusChanged: (status) {
+          // ignore: avoid_print
+          print("Status do utilizador mudou: $status");
+          // Aqui pode disparar outras ações, se quiser
+        },
+        child: MaterialApp.router(
+          routerConfig: rotasApp,
+          debugShowCheckedModeBanner: false,
+          theme: ThemeData.dark().copyWith(
+            primaryColor: Colors.tealAccent[400],
+            scaffoldBackgroundColor: const Color(0xFF121212),
+          ),
         ),
       ),
     );

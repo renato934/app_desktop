@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MaterialApp(home: TodoPage()));
-}
-
 class TodoPage extends StatefulWidget {
   const TodoPage({super.key});
 
@@ -12,7 +8,6 @@ class TodoPage extends StatefulWidget {
 }
 
 class _TodoPageState extends State<TodoPage> {
-  // Simulando utilizador atual com ID 1
   final int currentUserId = 1;
 
   final List<Map<String, String>> contatos = [
@@ -218,8 +213,6 @@ class _TodoPageState extends State<TodoPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-
-                    /// 🔧 Limita altura da lista ao necessário ou até 500px
                     ConstrainedBox(
                       constraints: BoxConstraints(
                         maxHeight: alturaCalculada.clamp(0, 500),
@@ -281,8 +274,7 @@ class _TodoPageState extends State<TodoPage> {
                                           : Colors.grey,
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                        color: Colors
-                                            .black, // borda para destacar o círculo no avatar
+                                        color: Colors.black,
                                         width: 2,
                                       ),
                                     ),
@@ -297,10 +289,7 @@ class _TodoPageState extends State<TodoPage> {
                         },
                       ),
                     ),
-
                     const SizedBox(height: 16),
-
-                    /// Botões de ação
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
@@ -315,7 +304,7 @@ class _TodoPageState extends State<TodoPage> {
                         ElevatedButton(
                           child: const Text('Confirmar Partilha'),
                           onPressed: () {
-                            if (selecionados.length > 0) {
+                            if (selecionados.isNotEmpty) {
                               _toggleShared(index);
                               Navigator.pop(context);
                             }
@@ -335,7 +324,7 @@ class _TodoPageState extends State<TodoPage> {
 
   void _toggleShared(int index) {
     setState(() {
-      _todoLists[index].shared = true ;
+      _todoLists[index].shared = true;
     });
   }
 
@@ -346,9 +335,7 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   Widget _buildMyListsTab() {
-    final myLists = _todoLists
-        .where((e) => e.ownerId == currentUserId)
-        .toList();
+    final myLists = _todoLists.where((e) => e.ownerId == currentUserId).toList();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -388,13 +375,18 @@ class _TodoPageState extends State<TodoPage> {
           if (myLists.isEmpty)
             const Center(child: Text('Nenhuma lista ainda!'))
           else
-            ListView.builder(
+            GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1,
+              ),
               itemCount: myLists.length,
               itemBuilder: (context, index) {
-                final item = myLists[index];
-                return _buildTodoCard(item, editable: true);
+                return _buildTodoCard(myLists[index]);
               },
             ),
         ],
@@ -403,95 +395,123 @@ class _TodoPageState extends State<TodoPage> {
   }
 
   Widget _buildSharedListsTab() {
-    final sharedFromOthers = _todoLists
-        .where((e) => e.shared && e.ownerId != currentUserId)
-        .toList();
+    final sharedFromOthers =
+        _todoLists.where((e) => e.shared && e.ownerId != currentUserId).toList();
 
     if (sharedFromOthers.isEmpty) {
       return const Center(child: Text('Nenhuma lista partilhada por outros.'));
     }
 
-    return ListView.builder(
+    return Padding(
       padding: const EdgeInsets.all(16),
-      itemCount: sharedFromOthers.length,
-      itemBuilder: (context, index) {
-        return _buildTodoCard(sharedFromOthers[index], editable: false);
-      },
+      child: GridView.builder(
+        itemCount: sharedFromOthers.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1,
+        ),
+        itemBuilder: (context, index) {
+          return _buildTodoCard(sharedFromOthers[index]);
+        },
+      ),
     );
   }
 
-  Widget _buildTodoCard(TodoListItem item, {bool editable = true}) {
+  Widget _buildTodoCard(TodoListItem item) {
     final index = _todoLists.indexOf(item);
+    final previewTasks = item.tasks.take(6).toList();
 
-    return Card(
-      color: const Color.fromRGBO(18, 18, 20, 1),
-
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      clipBehavior: Clip.antiAlias, // importante para ripple correto
-      child: Theme(
-        data: Theme.of(context).copyWith(
-          dividerColor: Colors.transparent,
-          splashColor: Colors.transparent,
-          highlightColor: Colors.transparent,
-        ),
-        child: ExpansionTile(
-          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          title: Row(
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TodoDetailsPage(
+              listItem: item,
+              editable: item.ownerId == currentUserId,
+              onTaskToggle: (taskIndex) => _toggleTaskDone(item, taskIndex),
+            ),
+          ),
+        );
+      },
+      child: Card(
+        color: const Color.fromRGBO(18, 18, 20, 1),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 item.title,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
+                  fontSize: 16,
                   color: Colors.white,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(width: 8),
-              if (item.shared)
-                Text("• "),
-                Text(
-                  "Partilhada",
-                  style: TextStyle(color: Colors.blue, fontSize: 14),
+              const SizedBox(height: 8),
+              ...previewTasks.map(
+                (task) => Row(
+                  children: [
+                    Icon(
+                      task.done
+                          ? Icons.check_box
+                          : Icons.check_box_outline_blank,
+                      size: 16,
+                      color: task.done ? Colors.green : Colors.white70,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        task.description,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (item.tasks.length > previewTasks.length)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    "+${item.tasks.length - previewTasks.length} mais...",
+                    style: const TextStyle(color: Colors.blue, fontSize: 12),
+                  ),
+                ),
+              const Spacer(),
+              if (item.ownerId == currentUserId)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        item.shared ? Icons.share : Icons.share_outlined,
+                        color: item.shared ? Colors.blue : Colors.white,
+                      ),
+                      onPressed: () => _mostrarDialogoPartilhar(context, index),
+                      tooltip: 'Partilhar',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.edit, color: Colors.white),
+                      onPressed: () => _editTodoList(index),
+                      tooltip: 'Editar',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _removeTodoList(index),
+                      tooltip: 'Apagar',
+                    ),
+                  ],
                 ),
             ],
           ),
-          childrenPadding: const EdgeInsets.symmetric(horizontal: 16),
-          children: [
-            ...item.tasks.asMap().entries.map(
-              (entry) => CheckboxListTile(
-                title: Text(
-                  entry.value.description,
-                  style: const TextStyle(color: Colors.white70),
-                ),
-                value: entry.value.done,
-                onChanged: editable
-                    ? (_) => _toggleTaskDone(item, entry.key)
-                    : null,
-              ),
-            ),
-            if (editable)
-              ButtonBar(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      item.shared ? Icons.share : Icons.share_outlined,
-                      color: item.shared ? Colors.blue : Colors.white,
-                    ),
-                    onPressed: () => _mostrarDialogoPartilhar(context, index),
-                    tooltip: 'Partilhar',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.white),
-                    onPressed: () => _editTodoList(index),
-                    tooltip: 'Editar',
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _removeTodoList(index),
-                    tooltip: 'Apagar',
-                  ),
-                ],
-              ),
-          ],
         ),
       ),
     );
@@ -521,7 +541,45 @@ class _TodoPageState extends State<TodoPage> {
         body: TabBarView(
           children: [_buildMyListsTab(), _buildSharedListsTab()],
         ),
-        floatingActionButton: FloatingActionButton(onPressed: () {}, child: Icon(Icons.add),),
+        floatingActionButton: FloatingActionButton(onPressed: () {}, child: Icon(Icons.add)),
+      ),
+    );
+  }
+}
+
+class TodoDetailsPage extends StatelessWidget {
+  final TodoListItem listItem;
+  final bool editable;
+  final Function(int) onTaskToggle;
+
+  const TodoDetailsPage({
+    Key? key,
+    required this.listItem,
+    required this.editable,
+    required this.onTaskToggle,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey[900],
+      appBar: AppBar(
+        title: Text(listItem.title),
+        backgroundColor: Colors.black,
+      ),
+      body: ListView.builder(
+        itemCount: listItem.tasks.length,
+        itemBuilder: (context, index) {
+          final task = listItem.tasks[index];
+          return CheckboxListTile(
+            value: task.done,
+            onChanged: editable ? (_) => onTaskToggle(index) : null,
+            title: Text(
+              task.description,
+              style: const TextStyle(color: Colors.white),
+            ),
+          );
+        },
       ),
     );
   }

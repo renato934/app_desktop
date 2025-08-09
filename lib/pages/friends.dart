@@ -1,3 +1,4 @@
+import 'package:app_desktop/basedados/querys.dart';
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
@@ -12,35 +13,7 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   int currentUserId = 1;
-  final String friendsQuery = r'''
-    subscription GetFriends($userId: Int!) {
-      amigos(
-        where: {
-          _or: [
-            {id_user1: {_eq: $userId}},
-            {id_user2: {_eq: $userId}}
-          ],
-          status: {_eq: 1}
-        }
-      ) {
-        user {
-          id
-          nome
-          status
-          tag
-          imagem
-        }
-        userByIdUser2 {
-          id
-          nome
-          status
-          tag
-          imagem
-        }
-      }
-    }
-  ''';
-
+  
   @override
   void initState() {
     super.initState();
@@ -71,7 +44,7 @@ class _FriendsState extends State<Friends> with SingleTickerProviderStateMixin {
             ? CircleAvatar(
                 radius: 19,
                 backgroundColor: Colors.grey[800],
-                backgroundImage: AssetImage(friend['imagem']!),
+                backgroundImage: NetworkImage(friend['imagem']!),
                 onBackgroundImageError: (_, __) {},
               )
             : CircleAvatar(

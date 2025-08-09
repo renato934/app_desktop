@@ -14,8 +14,10 @@ class Users {
   static Future<void> criarTabela({required Database db}) async {
     try {
       await db.execute(createTable);
+      // ignore: avoid_print
       print('✅ Criada: $tableName');
     } catch (e) {
+      // ignore: avoid_print
       print('❌ Erro ao criar $tableName: $e');
     }
   }

@@ -1,7 +1,10 @@
+import 'package:app_desktop/basedados/querys.dart';
 import 'package:app_desktop/pages/chat.dart';
 import 'package:app_desktop/pages/friends.dart';
 import 'package:app_desktop/pages/to-do.dart';
 import 'package:app_desktop/widget/card_conversas.dart';
+import 'package:app_desktop/widget/widget_perfil.dart';
+import 'package:app_desktop/widget/widget_selecionarAmigos.dart';
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
@@ -14,38 +17,54 @@ class _MainPageState extends State<MainPage> {
   final ScrollController _scrollController = ScrollController();
 
   int currentUserId = 1;
-  final String MensagensQuery = r'''
-    subscription GetMensagens($userId: Int!) {
-      grupo_membros(where: { id_user: { _eq: $userId } }) {
-        grupo {
-          id
-          nome
-          imagem
-          grupo_membros {
-            user {
-              id
-              nome
-              imagem
-              status
-            }
-          }
+  String contatoSelecionado = "Amigos";
+
+  void criarConversa(Set<int> ids, List<String> nomes) async{
+      final GraphQLClient client = GraphQLProvider.of(context).value;
+
+      String? nomeGrupo;
+      ids.add(currentUserId);
+
+      if(ids.length > 2)
+      {
+        nomeGrupo = nomes.join(', ');
+      }
+
+      // 1. Criar o grupo
+      final resultGrupo = await client.mutate(MutationOptions(
+        document: gql(newGrupo),
+        variables: {'nome': nomeGrupo},
+      ));
+
+      if (resultGrupo.hasException) {
+        print('Erro ao criar grupo: ${resultGrupo.exception.toString()}');
+        return;
+      }
+
+      final int grupoId = resultGrupo.data!['insert_grupos_one']['id'];
+
+      // 2. Adicionar membros ao grupo
+      for (final idUser in ids) {
+        final resultMembro = await client.mutate(MutationOptions(
+          document: gql(newGrupoMembros),
+          variables: {
+            'id_grupo': grupoId,
+            'id_user': idUser,
+          },
+        ));
+
+        if (resultMembro.hasException) {
+          print('Erro ao adicionar membro $idUser: ${resultMembro.exception.toString()}');
         }
       }
-    }
-  ''';
 
-  final String UserQuery = r'''
-    subscription getuser($userId: Int!) {
-      users(where: {id: {_eq: $userId}}) {
-        id
-        nome
-        imagem
-        status
-      }
-    }
-  ''';
+      print('Grupo "$nomeGrupo" criado com ID $grupoId e membros adicionados.');
 
-  String? contatoSelecionado = "Amigos";
+      setState(() {
+        contatoSelecionado = grupoId.toString();
+      });
+
+  }
 
   @override
   void dispose() {
@@ -95,8 +114,6 @@ class _MainPageState extends State<MainPage> {
                           },
                         ),
                         SizedBox(height: 20),
-
-                        // Título "Mensagens" e botão
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 8.0),
                           child: Row(
@@ -110,12 +127,35 @@ class _MainPageState extends State<MainPage> {
                                   color: Colors.white,
                                 ),
                               ),
-                              IconButton(
-                                padding: EdgeInsets.zero,
-                                constraints: BoxConstraints(),
-                                onPressed: () {},
-                                icon: Icon(Icons.add, color: Colors.white),
-                              ),
+                              Subscription(
+                                options: SubscriptionOptions(
+                                  document: gql(friendsQuery),
+                                  variables: {'userId': currentUserId},
+                                ),
+                                builder: (result) {
+                                  if (result.isLoading) return CircularProgressIndicator();
+
+                                  final rawFriends = (result.data!['amigos'] ?? []) as List<dynamic>;
+
+                                  final friendsList = rawFriends
+                                    .map((f) => extractFriend(f as Map<String, dynamic>, currentUserId))
+                                    .toList();                                  
+
+                                  return  IconButton(
+                                    padding: EdgeInsets.zero,
+                                    constraints: BoxConstraints(),
+                                    onPressed: () async {
+                                      final Map<String, dynamic>? selecionados = await selecionarAmigos(context, friendsList);
+                                      if (selecionados != null && selecionados.isNotEmpty) {
+                                        final Set<int> ids = selecionados['ids'];
+                                        final List<String> nomes = selecionados['nomes'];
+                                        criarConversa(ids, nomes);
+                                      }
+                                    },
+                                    icon: Icon(Icons.add, color: Colors.white),
+                                  );
+                                },
+                              )
                             ],
                           ),
                         ),
@@ -124,7 +164,7 @@ class _MainPageState extends State<MainPage> {
                         // Lista de contatos
                         Subscription(
                           options: SubscriptionOptions(
-                            document: gql(MensagensQuery),
+                            document: gql(mensagensQuery),
                             variables: {'userId': currentUserId},
                           ),
                           builder: (result, {fetchMore, refetch}) {
@@ -146,10 +186,11 @@ class _MainPageState extends State<MainPage> {
 
                             final amigos = result.data?['grupo_membros'] ?? [];
 
+  
+
                             return Column(
                               children: List.generate(amigos.length, (index) {
-                                final amigo =
-                                    amigos[index]['grupo']['grupo_membros'];
+                                final amigo = amigos[index]['grupo']['grupo_membros'];
                                 final outro;
 
                                 if (amigo.length == 2) {
@@ -157,9 +198,12 @@ class _MainPageState extends State<MainPage> {
                                   final user1 = amigo[0]['user'];
                                   final user2 = amigo[1]['user'];
 
-                                  outro = user1['id'] == currentUserId
-                                      ? user2
-                                      : user1;
+                                  final outroUser = user1['id'] == currentUserId ? user2 : user1;
+
+                                  outro = {
+                                    ...outroUser,  
+                                    'id_grupo': amigos[index]['grupo']['id'],
+                                  };
                                 } else {
                                   outro = amigos[index]['grupo'];
                                 }
@@ -172,8 +216,7 @@ class _MainPageState extends State<MainPage> {
                                     status: outro['status'] != null ? outro['status'] : -1,
                                     onTap: () {
                                       setState(() {
-                                        contatoSelecionado = outro['id']
-                                            .toString();
+                                        contatoSelecionado = outro['id_grupo'] != null ? outro['id_grupo'].toString() : outro['id'].toString();
                                       });
                                     },
                                   ),
@@ -189,7 +232,7 @@ class _MainPageState extends State<MainPage> {
 
                 Subscription(
                   options: SubscriptionOptions(
-                    document: gql(UserQuery),
+                    document: gql(userQuery),
                     variables: {'userId': currentUserId},
                   ),
                   builder: (result, {fetchMore, refetch}) {
@@ -209,7 +252,7 @@ class _MainPageState extends State<MainPage> {
 
                     final user = result.data?['users'][0];
 
-                    return _buildperfil(context, user);
+                    return buildperfil(context, user);
                   },
                 ),
               ],
@@ -224,7 +267,7 @@ class _MainPageState extends State<MainPage> {
                   ? Friends()
                   : contatoSelecionado == "TO-DO"
                   ? TodoPage()
-                  : ChatPage(),
+                  : ChatPage(idgrupo: int.parse(contatoSelecionado)),
             ),
           ),
         ],
@@ -268,70 +311,12 @@ class MenuItemButton extends StatelessWidget {
   }
 }
 
-Widget _buildperfil(BuildContext context, Map<String, dynamic> user) {
-  return Padding(
-    padding: EdgeInsets.only(bottom: 15, left: 20, right: 20),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Stack(
-              children: [
-                user['imagem'] != null && user['imagem'].isNotEmpty
-                    ? CircleAvatar(
-                        radius: 19,
-                        backgroundColor: Colors.grey[800],
-                        backgroundImage: NetworkImage(user['imagem']),
-                        onBackgroundImageError: (_, __) {},
-                      )
-                    : CircleAvatar(
-                        radius: 19,
-                        backgroundColor: Colors.grey[800],
-                        child: Icon(Icons.person, color: Colors.white, size: 19),
-                      ),
-                if (user['status'] != -1)
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: user['status'] == 2
-                            ? Colors.green
-                            : user['status'] == 1
-                                ? Color.fromARGB(255, 253, 198, 0)
-                                : Colors.grey,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.black,
-                          width: 2,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            SizedBox(width: 10),
-            Text(
-                user['nome'] ?? '',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
-              ),
-          ],
-        ),
-        Row(
-          children: [
-            Icon(Icons.mic, color: Colors.white, size: 20),
-            SizedBox(width: 12),
-            Icon(Icons.headset, color: Colors.white, size: 20),
-            SizedBox(width: 12),
-            Icon(Icons.settings, color: Colors.white, size: 20),
-          ],
-        ),
-      ],
-    ),
-  );
+
+Map<String, dynamic> extractFriend(Map<String, dynamic> friendship, int currentId) {
+  final idUser1 = friendship['user']['id'];
+  if (idUser1 == currentId) {
+    return friendship['userByIdUser2'];
+  } else {
+    return friendship['user'];
+  }
 }
