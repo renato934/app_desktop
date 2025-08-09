@@ -112,6 +112,25 @@ final updateLidaMutation = r'''
   }
 ''';
 
+//Página to-do
+final String gettarefas = r'''
+  subscription getTarefas($iduser: Int!) {
+  todo_lists(where: {id_user: {_eq: $iduser}}) {
+    id
+    titulo
+    id_user
+    tarefas: tarefas {
+      id
+      tarefa
+      completed
+      created_at
+    }
+  }
+}
+''';
+
+
+
 // Pagina de Amigos
   // Tambem usado na pagina principal
   final String friendsQuery = r'''
