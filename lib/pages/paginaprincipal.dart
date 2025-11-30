@@ -263,16 +263,26 @@ class _MainPageState extends State<MainPage> {
           Expanded(
             child: Container(
               color: Colors.grey[900],
-              child: contatoSelecionado == "Amigos"
-                  ? Friends()
-                  : contatoSelecionado == "TO-DO"
-                  ? TodoPage()
-                  : ChatPage(idgrupo: int.parse(contatoSelecionado)),
+              child: IndexedStack(
+                index: _getSelectedIndex(),
+                children: [
+                  Friends(),
+                  TodoPage(),
+                  if (contatoSelecionado != "Amigos" && contatoSelecionado != "TO-DO")
+                    ChatPage(idgrupo: int.parse(contatoSelecionado)),
+                ],
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  int _getSelectedIndex() {
+    if (contatoSelecionado == "Amigos") return 0;
+    if (contatoSelecionado == "TO-DO") return 1;
+    return 2;
   }
 }
 
