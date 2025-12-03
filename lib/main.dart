@@ -12,7 +12,7 @@ void main() async {
   final instance = FlutterSingleInstance();
 
   if (await instance.isFirstInstance()) {
-    final HttpLink httpLink = HttpLink('http://188.82.117.231:8080/v1/graphql');
+    final HttpLink httpLink = HttpLink('http://xxx.xxx.xxx.xxx:xxxx/xx/xx');
 
     final WebSocketLink websocketLink = WebSocketLink(
       'ws://188.82.117.231:8080/v1/graphql',
